@@ -2,7 +2,7 @@
 	import {reactive,ref} from 'vue'
 	import {useStore} from 'vuex'
 	import LeftMenu from '../components/menu.vue'
-	import { users, article} from '../utils/request.js'
+	import { users, article, comment } from '../utils/request.js'
 	import { ElMessage } from 'element-plus'
 	import time from '../utils/time.js'
 	import {
@@ -17,12 +17,15 @@
 	const store = useStore()
 	const articles = ref(reactive([]))
 	const user = ref(reactive({}))//用于查找文章所有者
+	const comments = ref(reactive([]))
 	const loading = ref(true)//加载中，emmm
 	const ShowPublish = ref(false)
 	const myarticle = reactive({
 		title:'',
 		content:'',
 	})
+	const comment_content = ref('')
+	
 	function delay(ms){
 		return new Promise((resolve,reject)=>{
 			setTimeout(()=>{
@@ -50,10 +53,31 @@
 		res.reverse()
 		console.log(store.state.uid)
 		articles.value = res
+	}
+	const getComment = async function(){
+		//获取评论列表
+		await getArticle()
+		let res = await comment.list()
+		if(typeof res != 'object'){
+			ElMessage.error(res)
+			return
+		}
+		let temp = {}
+		console.log(res)
+		for(let x = res.length-1;x>=0;x--){
+			if(!temp.hasOwnProperty(res[x].aid.toString())){
+				//没有属性，需要新建
+				temp[res[x].aid.toString()] = []
+				console.log(`${res[x].aid}需要构建`)
+			}
+			temp[res[x].aid.toString()].push(res[x])
+		}
+		comments.value = temp
 		//加载完成
 		loading.value = false
 	}
-	getArticle()
+	getComment()
+	
 	
 	//发表文章
 	const submitArticle = async function(){
@@ -99,7 +123,37 @@
 			ElMessage.error(res)
 			return
 		}
-		getArticle()
+		await getArticle()
+		ElMessage({
+		  message: res.msg,
+		  type: 'success',
+		})
+	}
+	
+	//新增评论
+	const postComment = async (aid) =>{
+		let res = await comment.post(aid,comment_content.value,store.state.token)
+		if(typeof res != 'object'){
+			ElMessage.error(res)
+			return
+		}
+		await getComment()
+		comment_content.value = ""
+		await getComment()
+		ElMessage({
+		  message: res.msg,
+		  type: 'success',
+		})
+	}
+	
+	//删除评论
+	const delComment = async function(id){
+		let res = await comment.del(id,store.state.token)
+		if(typeof res != 'object'){
+			ElMessage.error(res)
+			return
+		}
+		await getComment()
 		ElMessage({
 		  message: res.msg,
 		  type: 'success',
@@ -161,8 +215,8 @@
 						<pre>{{item.content}}</pre>
 					</div>
 					<div class="footer">
-						<div class="recive">
-							<el-popconfirm
+						<div class="recive" v-if="store.state.hasOwnProperty('uid') && store.state.uid >= 1">
+							<el-popconfirm v-if="item.recive.split(',').indexOf(store.state.uid.toString()) < 0"
 							    confirm-button-text="Yes"
 							    cancel-button-text="No"
 							    :icon="InfoFilled"
@@ -175,9 +229,9 @@
 								</template>
 							</el-popconfirm>
 							<div class="tips" v-if="item.recive != null">
-								<span v-for="(item2,index2) in item.recive.split(',').shift()">
+								<span v-for="(item2,index2) in item.recive.split(',').filter(s => s != '')">
 									<img :src="user[`${item2}`].avaurl" >
-									{{user[`${item2}`].nickname}}
+									{{user[`${item2}`].nickname}}<span v-if="index2 != item.recive.split(',').filter(s => s != '').length-1">、</span>
 									
 								</span>
 								<span>
@@ -191,6 +245,47 @@
 						</div>
 						<div class="name">{{user[`${item.uid}`].nickname}}</div>
 						<div class="time">{{time.format(item.time * 1000)}}</div>
+						<div class="comment" v-if="store.state.hasOwnProperty('uid') && store.state.uid >= 1">
+							<div class="comment_title">
+								评论区
+							</div>
+							<div class="post_comment">
+								<!-- 发表评论的地方 -->
+								<el-input
+								    v-model="comment_content"
+								    autosize
+								    type="textarea"
+								    placeholder="输入你的评论"
+									style="display: block;"
+								/>
+								<el-button class="submit_button" type="primary" @click="postComment(`${item.id}`)">发表</el-button>
+							</div>
+							<div class="no_comment" v-if="!comments.hasOwnProperty(`${item.id}`)">
+								暂时没有评论
+							</div>
+							<div v-else class="comment_content">
+								<div class="each_comment" v-for="(item3,index3) in comments[`${item.id}`]">
+									<img :src="user[`${item3.uid}`].avaurl">{{user[`${item3.uid}`].nickname}} 说 ：{{item3.content}}
+									<div class="tips">
+										{{time.format(item3.time * 1000)}}
+									</div>
+									<div class="del">
+										<el-popconfirm v-if="item3.uid == store.state.uid"
+										    confirm-button-text="Yes"
+										    cancel-button-text="No"
+										    :icon="InfoFilled"
+										    icon-color="red"
+										    title="确认删除评论吗?"
+										    @confirm="delComment(`${item3.id}`)"
+										  >
+											<template #reference>
+												<el-button class="del_button" type="warning">删除</el-button>
+											</template>
+										</el-popconfirm>
+									</div>
+								</div>
+							</div>
+						</div>
 					</div>
 				  </el-card>
 			</div>
@@ -263,7 +358,7 @@
 							margin-left:20px;
 						}
 						.tips{
-							margin-top:10px;
+							margin-top:20px;
 							span{
 								color:orangered;
 								line-height:40px;
@@ -283,18 +378,73 @@
 						}
 					}
 					.name{
-						margin-top:-30px;
+						margin-top:-20px;
 						text-align: right;
 						font-size:18px;
 						color:#444;
 						line-height: 36px;
 					}
 					.time{
-						margin-top:-10px;
+						margin-top:-5px;
 						text-align: right;
 						line-height: 30px;
 						font-size:16px;
 						color:#a5b3c2;
+					}
+					.comment{
+						width:90%;
+						padding:15px 25px;
+						box-sizing: border-box;
+						margin-left:5%;
+						margin-top:10px;
+						.post_comment{
+							display: flex;
+							flex-wrap: nowrap;
+							flex-direction: row;
+							margin-bottom: 15px;
+							.submit_button{
+								margin-left: 20px;
+							}
+						}
+						.comment_title{
+							letter-spacing: 8px;
+							color:#111;
+							font-size:24px;
+							line-height:42px;
+							text-shadow: 1px 1px 3px #000;
+							text-align: center;
+						}
+						.no_comment{
+							text-align: center;
+							margin-top:2px;
+							line-height:28px;
+							font-size:16px;
+						}
+						.comment_content{
+							.each_comment{
+								img{
+									width:40px;
+									height:40px;
+									border-radius: 20px;
+									box-shadow:2px 2px 4px #ccc;
+									margin-right:10px;
+								}
+								margin-bottom:20px;
+								width:100%;
+								box-sizing: border-box;
+								font-size:16px;
+								line-height:40px;
+								border-bottom: 1px solid #ccc;
+								.tips{
+									color:#666;
+									font-size:14px;
+									line-height:20px;
+								}
+								.del{
+									margin-bottom: 5px;
+								}
+							}
+						}
 					}
 				}
 			}

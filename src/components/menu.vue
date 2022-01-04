@@ -4,7 +4,7 @@
 	  Location,
 	  Document,
 	  Menu as IconMenu,
-	  Setting,
+	  Calendar
 	} from '@element-plus/icons-vue'
 	import {useStore} from 'vuex'
 	import { ElMessage } from 'element-plus'
@@ -157,8 +157,8 @@
 		</router-link>
 		<router-link to="/setting">
 			<el-menu-item index="3">
-			  <el-icon><setting /></el-icon>
-			  <template #title>设置</template>
+			  <el-icon><calendar /></el-icon>
+			  <template #title>日历</template>
 			</el-menu-item>
 		</router-link>
 	  </el-menu>

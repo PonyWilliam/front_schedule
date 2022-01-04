@@ -124,4 +124,44 @@ const article = {
 		return res
 	}
 }
-export {users,article}
+
+//评论方法合集
+const comment = {
+	list:async function(){
+		let res = await _request(`${config.back_url}${config.comment}`)
+		if(typeof res != 'object') {
+			console.log(res)
+			return "服务端错误"
+		}
+		if(res.code == 500){
+			return res.code
+		}
+		return res
+	},
+	post:async function(aid,content,token){
+		let res = await _request(`${config.back_url}${config.comment}`,'POST',{
+			aid,
+			content
+		},token)
+		if(typeof res != 'object') {
+			console.log(res)
+			return "服务端错误"
+		}
+		if(res.code == 500){
+			return res.msg
+		}
+		return res
+	},del:async function(id,token){
+		let res = await _request(`${config.back_url}${config.comment}/id/${id}`,'DELETE',{
+		},token)
+		if(typeof res != 'object') {
+			console.log(res)
+			return "服务端错误"
+		}
+		if(res.code == 500){
+			return res.msg
+		}
+		return res
+	}
+}
+export {users,article,comment}
