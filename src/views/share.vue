@@ -99,15 +99,13 @@
 	}
 	const renameTencentCos = () => {
 		return new Promise((resolve,reject)=>{
-			let del_name = old_name.value
-			old_name.value = encodeURIComponent(old_name.value)
-			new_name.value = encodeURIComponent(new_name.value)
+			let temp_old = encodeURIComponent(old_name.value)
 			console.log(old_name.value,new_name.value)
 			cos.putObjectCopy({
 			    Bucket: 'pan-1257689370',
 			    Region: 'ap-guangzhou',
 			    Key:new_name.value,
-			    CopySource: `pan-1257689370.cos.ap-guangzhou.myqcloud.com/${old_name.value}`, /* 必须 */
+			    CopySource: `pan-1257689370.cos.ap-guangzhou.myqcloud.com/${temp_old}`, /* 必须 */
 			}, function(err, data) {
 			    if (err){
 					console.log('put error')
@@ -118,7 +116,7 @@
 			    cos.deleteObject({
 			        Bucket: 'pan-1257689370',
 			        Region: 'ap-guangzhou',
-			        Key: del_name
+			        Key: old_name.value
 			    }, function(err, data) {
 			        if (err){
 						console.log('delete error')
