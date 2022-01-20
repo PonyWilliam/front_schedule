@@ -28,6 +28,9 @@
 	const submitUpload = () => {
 		uploadRef.value!.submit()
 	}
+	const new_name = ref('')
+	const old_name = ref('')
+	const dialogFormVisible = ref(false)
 	const useTencentCos = (file) => {
 		return new Promise((resolve,reject)=>{
 			cos.putObject({
@@ -77,6 +80,56 @@
 			    }
 			    resolve(data)
 			});
+		})
+	}
+	const deleteTencentCos = (Key) => {
+		return new Promise((resolve,reject)=>{
+			cos.deleteObject({
+			    Bucket: 'pan-1257689370', /* 填入您自己的存储桶，必须字段 */
+			    Region: 'ap-guangzhou',  /* 存储桶所在地域，例如ap-beijing，必须字段 */
+			    Key,  /* 存储在桶里的对象键（例如1.jpg，a/b/test.txt），必须字段 */
+			}, function(err, data) {
+			    if(err && (err != null || err != undefined)){
+			    	reject(err)
+			    	return
+			    }
+			    resolve(data)
+			});
+		})
+	}
+	const renameTencentCos = () => {
+		return new Promise((resolve,reject)=>{
+			let del_name = old_name.value
+			old_name.value = encodeURIComponent(old_name.value)
+			new_name.value = encodeURIComponent(new_name.value)
+			console.log(old_name.value,new_name.value)
+			cos.putObjectCopy({
+			    Bucket: 'pan-1257689370',
+			    Region: 'ap-guangzhou',
+			    Key:new_name.value,
+			    CopySource: `pan-1257689370.cos.ap-guangzhou.myqcloud.com/${old_name.value}`, /* 必须 */
+			}, function(err, data) {
+			    if (err){
+					console.log('put error')
+					console.log(err)
+					reject(err)
+					return
+				}
+			    cos.deleteObject({
+			        Bucket: 'pan-1257689370',
+			        Region: 'ap-guangzhou',
+			        Key: del_name
+			    }, function(err, data) {
+			        if (err){
+						console.log('delete error')
+						console.log(err)
+						reject (err)
+						return
+					}
+					resolve(data)
+			    });
+			});
+
 		})
 	}
 	const beforeUpload = async (file) => {
@@ -130,8 +183,62 @@
 		}
 	}
 	
+	const rename_file = async function(){
+		try{
+			let res = await renameTencentCos()
+			dialogFormVisible.value = false
+			console.log(res)
+			ElMessage({
+				type:'success',
+				message:'重命名成功',
+			})
+			list()
+			
+		}catch(e){
+			ElMessage.error('重命名失败')
+			console.log(e)
+		}
+	}
+	
+	const del_file = async function(filename){
+		
+		try{
+			let res = await deleteTencentCos(filename)
+			console.log(res)
+			ElMessage({
+				type:'success',
+				message:'删除文件成功'
+			})
+			list()
+		}catch(e){
+			ElMessage.error('删除文件失败')
+		}
+	}
+	
+	const open_rename = (name) => {
+		dialogFormVisible.value = true
+		old_name.value = name
+		console.log(name)
+		
+	}
 </script>
 <template>
+	  <el-dialog v-model="dialogFormVisible" title="重命名文件(自行设置后缀)">
+	    <el-form>
+	      <el-form-item label="新名称:">
+	        <el-input v-model="new_name" autocomplete="off"></el-input>
+	      </el-form-item>
+	    </el-form>
+	    <template #footer>
+	      <span class="dialog-footer">
+	        <el-button @click="dialogFormVisible = false">取消</el-button>
+	        <el-button type="primary" @click="rename_file()">重命名</el-button>
+	      </span>
+	    </template>
+	  </el-dialog>
+	
+	
+	
 	<div class="container">
 		<left-menu now="2"></left-menu>
 		<div class="right" v-if="typeof store.state.uid != 'undefined' && store.state.uid > 0">
@@ -169,6 +276,20 @@
 			<div class="show" v-if="files_list.length > 0">
 				<div class="file_card" v-for="(item,index) in files_list">
 				      <el-card class="card" :body-style="{ padding: '5px 10px' }">
+						<div class="card_header">
+							<el-popconfirm
+							    confirm-button-text="Yes"
+							    cancel-button-text="No"
+							    :icon="InfoFilled"
+							    icon-color="red"
+							    title="是否确认删除?"
+							    @confirm="del_file(item.Key)"
+							  >
+								<template #reference>
+								<el-button type="danger" :icon="Delete" circle></el-button>
+								</template>
+							</el-popconfirm>
+						</div>
 				        <img
 				          src="https://arcsoft.dadiqq.cn/file.jpg"
 				          class="image"
@@ -178,6 +299,8 @@
 				          <div class="bottom">
 				            <time class="size">{{Math.round(item.Size / 1024)}}kb</time>
 				            <el-button type="text" class="button" @click="get_file(`${item.Key}`)">下载</el-button>
+							<el-button type="text" class="button" @click="open_rename(`${item.Key}`)">重命名</el-button>
+							
 				          </div>
 				        </div>
 				      </el-card>
@@ -197,11 +320,24 @@
 
 
 <style lang="scss">
+:root {
+	--el-color-primary: #409eff;
+	--el-color-success: #67c23a;
+	--el-color-warning: #e6a23c;
+	--el-color-danger: #f56c6c;
+	--el-color-error: #f56c6c;
+	--el-color-info: #909399;
+}
 .container{
 	display: flex;
 	flex-wrap: wrap;
 	padding:0;
 	margin:0;
+	.card_header{
+		display: flex;
+		flex-direction: row-reverse;
+		margin-bottom: 10px;
+	}
 	.permission{
 		font-size:30px;
 		line-height:60px;

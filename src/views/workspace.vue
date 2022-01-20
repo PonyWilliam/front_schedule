@@ -216,7 +216,7 @@
 					</div>
 					<div class="footer">
 						<div class="recive" v-if="store.state.hasOwnProperty('uid') && store.state.uid >= 1">
-							<el-popconfirm v-if="item.recive.split(',').indexOf(store.state.uid.toString()) < 0"
+							<el-popconfirm v-if="item.recive == null || item.recive.split(',').indexOf(store.state.uid.toString()) < 0"
 							    confirm-button-text="Yes"
 							    cancel-button-text="No"
 							    :icon="InfoFilled"
